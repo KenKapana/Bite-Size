@@ -8,21 +8,12 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from flask import Flask, render_template, request, jsonify
 
-from dotenv import load_dotenv
-from pprint import pprint
-import requests
-import os
-
-load_dotenv()
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
 
-def main(title="", time="0"):
-
-    request_url = f'https://www.googleapis.com/calendar/v3/calendars/rpsj44u6koirtq5hehkt21qs6k%40group.calendar.google.com/events?appid={os.geteng("API_KEY")}&q={title}&v={time}'
+def main():
 
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -42,11 +33,11 @@ def main(title="", time="0"):
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
     
-    
+    time = 1
+    title = 'nothin'
     add_event(creds, time, title)
-    return 
+    return 'added!'
 
-#key=AIzaSyBH79yPuU82JSl0tKX8CfqJBEHFwdFlJL8
 def add_event(creds, duration_split: int, title: str) -> str:
     """
     Add an event to the user's Google Calendar.
@@ -195,75 +186,6 @@ def get_event_durations(creds, calendar_id='primary'):
 
 # If modifying these scopes, delete the file token.json.
 # SCOPES = ["https://www.googleapis.com/auth/calendar"]
-
-# def authenticate_google_calendar():
-#     creds = None
-#     # The file token.json stores the user's access and refresh tokens, and is
-#     # created automatically when the authorization flow completes for the first
-#     # time.
-#     if os.path.exists("token.json"):
-#         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-#     # If there are no (valid) credentials available, let the user log in.
-#     if not creds or not creds.valid:
-#         if creds and creds.expired and creds.refresh_token:
-#             creds.refresh(Request())
-#         else:
-#             flow = InstalledAppFlow.from_client_secrets_file(
-#                 "credentials.json", SCOPES
-#             )
-#             creds = flow.run_local_server(port=0)
-#         # Save the credentials for the next run
-#         with open("token.json", "w") as token:
-#             token.write(creds.to_json())
-   
-# def commitHours(creds):
-#     """
-#     Save previous events into database.
-#     """
-#     try:
-#         service = build("calendar", "v3", credentials=creds)
-
-#         # Call the Calendar API
-#         today = datetime.datetime.today()
-#         timeMin = today.replace(hour=9, minute=0, second=0, microsecond=0).isoformat() + "Z"
-#         timeMax = today.replace(hour=17, minute=0, second=0, microsecond=0).isoformat() + "Z"
-#         print("Getting today's coding hours")
-#         events_result = (
-#             service.events()
-#             .list(
-#                 calendarId="primary",
-#                 timeMin=timeMin,
-#                 timeMax=timeMax,
-#                 singleEvents=True,
-#                 orderBy="startTime"
-#             )
-#             .execute()
-#         )
-#         events = events_result.get("items", [])
-
-#         if not events:
-#             print("No upcoming events found.")
-#             return
-        
-#         total_duration = datetime.timedelta(
-#             seconds=0,
-#             minutes=0,
-#             hours=0,
-#         )
-#         print("Coding hours:")
-#         for event in events:
-#             start = event['start'].get('dateTime', event['start'].get('date'))
-#             end = event['end'].get('dateTime', event['end'].get('date'))
-
-#             start_formatted = parser.isoparse(start)
-#             end_formatted = parser.isoparse(end)
-#             duration = end_formatted - start_formatted
-#             total_duration += duration
-#             print(f"{event['summary']}, duration: {duration}")
-#         print(f"Total coding time: {total_duration}")
-
-#     except HttpError as error:
-#         print(f"An error occurred: {error}")
 
 
 if __name__ == "__main__":
