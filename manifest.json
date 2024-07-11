@@ -1,0 +1,36 @@
+{
+    "manifest_version": 3,
+    "name": "Google Calendar Event Adder",
+    "version": "1.0",
+    "description": "An extension to add events to Google Calendar.",
+    "permissions": [
+      "identity",
+      "identity.email",
+      "activeTab",
+      "storage",
+      "https://www.googleapis.com/"
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_popup": "index.html",
+      "default_icon": {
+        "16": "static/images/icon16.png",
+        "48": "static/images/icon48.png",
+        "128": "static/images/icon128.png"
+      }
+    },
+    "oauth2": {
+      "client_id": "1061790460625-asmvr8l9ulr910fed9s9moihueoji9h1.apps.googleusercontent.com",
+      "scopes": [
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar"
+      ]
+    },
+    "icons": {
+        "16": "static/images/icon16.png",
+        "48": "static/images/icon48.png",
+        "128": "static/images/icon128.png"
+    }
+  }

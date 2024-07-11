@@ -8,11 +8,17 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-
+from flask import Flask, render_template, request
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
+app = Flask(__name__)
 
+@app.route("/")
+def index():
+    return render_template('index.html')
+
+@app.route("/add", methods=['GET', 'POST'])
 def main():
 
     creds = None
@@ -32,13 +38,17 @@ def main():
         # Save the credentials for the next run
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
-    
-    time = 1
-    title = 'nothin'
-    add_event(creds, time, title)
-    return 'added!'
 
-def add_event(creds, duration_split: int, title: str) -> str:
+    if request.method=='POST':
+        title = request.form['title']
+        time = request.form['time']
+        add_event(creds, title, time)
+        print('added')
+        return render_template('index.html', result = 'success')
+    else:
+        return render_template('index.html', result = 'fail')
+    
+def add_event(creds, title: str, duration_split: int) -> str:
     """
     Add an event to the user's Google Calendar.
     """
@@ -189,4 +199,5 @@ def get_event_durations(creds, calendar_id='primary'):
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    app.run()

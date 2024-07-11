@@ -11,7 +11,7 @@
   </head>
   <body>
     <h1>Later! extension</h1>
-    <form action="/events">
+    <form action="/add" method="POST">
       <input type="text" name="title" id="title" placeholder="Enter a title" />
       <input
         type="text"
@@ -19,7 +19,11 @@
         id="time"
         placeholder="Enter duration of task"
       />
-      <button type="submit">Submit</button>
+      <input type="submit" value="Submit">
+      <p id="result"></p>
     </form>
+  <script>
+    document.getElementById("result").innerHTML = "{{result}}"
+  </script>
   </body>
 </html>
