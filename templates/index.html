@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Later! extension</title>
+    <link
+      href="{{url_for('static', filename='styles/style.css')}}"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <h1>Later! extension</h1>
+    <form action="/events">
+      <input type="text" name="title" id="title" placeholder="Enter a title" />
+      <input
+        type="text"
+        name="time"
+        id="time"
+        placeholder="Enter duration of task"
+      />
+      <button type="submit">Submit</button>
+    </form>
+  </body>
+</html>
