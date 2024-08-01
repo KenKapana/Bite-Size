@@ -1,53 +1,162 @@
 import datetime
 import pytz
 import os.path
+import os
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import google.auth.transport.requests
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
 
-from flask import Flask, render_template, request
+from flask import render_template, redirect, Flask, session, jsonify, url_for, request
+import flask 
+import requests
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+from dotenv import load_dotenv
 
+load_dotenv()
+
+CLIENT_SECRETS_FILE = "credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+CLIENT_ID=os.getenv("API_CLIENT_ID")
+FLASK_SECRET=os.getenv("FLASK_SECRET")
+
+API_SERVICE_NAME = 'drive'
+API_VERSION = 'v2'
+
+#activate flask
 app = Flask(__name__)
+app.secret_key = FLASK_SECRET
 
 @app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route("/add", methods=['GET', 'POST'])
-def main():
+#for documentation on google login go to:
+#https://developers.google.com/identity/protocols/oauth2/web-server#python
 
-    creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+@app.route("/authorize")
+def authorize():
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE, scopes=SCOPES
+    )
+    #this uri must match with the authorized uri in google console
+    flow.redirect_uri = flask.url_for('oauth2callback', _external=True)
 
-    if request.method=='POST':
-        title = request.form['title']
-        time = request.form['time']
-        add_event(creds, title, time)
-        print('added')
-        return render_template('index.html', result = 'success')
+    authorization_url, state = flow.authorization_url(
+        # Enable offline access so that you can refresh an access token without
+        # re-prompting the user for permission. Recommended for web server apps.
+        access_type='offline',
+        #best practice for security
+        #enable incremental authorization
+        include_granted_scopes='true'
+    )
+    session['state'] = state
+
+    return redirect(authorization_url)
+
+@app.route('/oauth2callback')
+def oauth2callback():
+    state = session['state']
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE, scopes=SCOPES, state=state
+    )
+    flow.redirect_uri = url_for('oauth2callback', _external=True)
+
+    authorization_response = request.url
+    flow.fetch_token(authorization_response=authorization_response)
+
+    credentials = flow.credentials
+    session['credentials'] = credentials_to_dict(credentials)
+
+    return redirect(url_for('index'))
+
+@app.route('/revoke')
+def revoke():
+    if 'credentials' not in session:
+        return ('You need to <a href="/authorize">authorize</a> before testing the code to revoke credentials.')
+
+    credentials = google.oauth2.credentials.Credentials(
+        **session['credentials']
+    )
+
+    revoke = requests.post('https://oauth2.googleapis.com/revoke',
+                           params={'token': credentials.token},
+                           headers= {'content-type': 'application/x-www-form-urlencoded'})
+    status_code = getattr(revoke, 'status_code')
+    if status_code == 200:
+        return ('Credentials successfully revoken.' + print_index_table())
     else:
-        return render_template('index.html', result = 'fail')
+        return ('An error occurred.' + print_index_table())
     
+@app.route('/clear')
+def clear_credentials():
+    if 'credentials' in session:
+        del session['credentials']
+    return ('Credentials have been cleared. <br><br>'+print_index_table())
+    
+def credentials_to_dict(credentials):
+    return {'token': credentials.token,
+          'refresh_token': credentials.refresh_token,
+          'token_uri': credentials.token_uri,
+          'client_id': credentials.client_id,
+          'client_secret': credentials.client_secret,
+          'scopes': credentials.scopes}
+
+def print_index_table():
+  return ('<table>' +
+          '<tr><td><a href="/test">Test an API request</a></td>' +
+          '<td>Submit an API request and see a formatted JSON response. ' +
+          '    Go through the authorization flow if there are no stored ' +
+          '    credentials for the user.</td></tr>' +
+          '<tr><td><a href="/authorize">Test the auth flow directly</a></td>' +
+          '<td>Go directly to the authorization flow. If there are stored ' +
+          '    credentials, you still might not be prompted to reauthorize ' +
+          '    the application.</td></tr>' +
+          '<tr><td><a href="/revoke">Revoke current credentials</a></td>' +
+          '<td>Revoke the access token associated with the current user ' +
+          '    session. After revoking credentials, if you go to the test ' +
+          '    page, you should see an <code>invalid_grant</code> error.' +
+          '</td></tr>' +
+          '<tr><td><a href="/clear">Clear Flask session credentials</a></td>' +
+          '<td>Clear the access token currently stored in the user session. ' +
+          '    After clearing the token, if you <a href="/test">test the ' +
+          '    API request</a> again, you should go back to the auth flow.' +
+          '</td></tr></table>')
+
+
+@app.route('/add', methods=['GET', 'POST'])
+def add():
+    if 'credentials' in session:
+
+        creds = google.oauth2.credentials.Credentials(
+            **session['credentials']
+        )
+        print(creds)
+        
+        if request.method=='POST':
+            title = request.form['title']
+            time = request.form['time']
+            add_event(creds, title, time)
+            print('added')
+            return render_template('index.html', result = 'success')
+        else:
+            return render_template('index.html', result = 'fail')
+    else:
+        return redirect(url_for('authorize'))
+
+    # if request.method=='POST':
+    #     creds = get_token_file_path(session['user_id'])
+    #     title = request.form['title']
+    #     time = request.form['time']
+    #     add_event(creds, title, time)
+    #     print('added')
+    # return render_template('index.html', result = 'added')
+
+
 def add_event(creds, title: str, duration_split: int) -> str:
     """
     Add an event to the user's Google Calendar.
@@ -84,7 +193,7 @@ def add_event(creds, title: str, duration_split: int) -> str:
 
         event = service.events().insert(calendarId='primary', body=event).execute()
         # return (f'Event created:\nTime: {start_time}-{end_time}\nName: {title}\nLink: {event.get("htmlLink")}')
-        return (f'event created: {title}')
+        return (f'event created: {event}')
     except HttpError as error:
         print(f"An error occurred in add_event: {error}")
 
@@ -200,4 +309,5 @@ def get_event_durations(creds, calendar_id='primary'):
 
 if __name__ == "__main__":
     # main()
-    app.run()
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+    app.run('localhost', 8080, debug=True)

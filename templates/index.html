@@ -11,7 +11,17 @@
   </head>
   <body>
     <h1>Later! extension</h1>
-    <form action="/add" method="POST">
+    <!-- session status -->
+     <div name="session">
+      {% if session %}
+      <div><pre>{{pretty}}</pre></div>
+      {% else %}
+      <p><a href="{{url_for('authorize')}}">Login with Google</a></p>
+      {% endif %}
+     </div>
+     
+    <!-- event adder element -->
+    <form action="/add" method="post">
       <input type="text" name="title" id="title" placeholder="Enter a title" />
       <input
         type="text"
@@ -19,11 +29,11 @@
         id="time"
         placeholder="Enter duration of task"
       />
-      <input type="submit" value="Submit">
+      <input type="submit" value="Submit" />
       <p id="result"></p>
     </form>
-  <script>
-    document.getElementById("result").innerHTML = "{{result}}"
-  </script>
+    <script>
+      document.getElementById("result").innerHTML = "{{result}}";
+    </script>
   </body>
 </html>
