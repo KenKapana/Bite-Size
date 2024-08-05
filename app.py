@@ -8,6 +8,8 @@ from googleapiclient.errors import HttpError
 import google.auth.transport.requests
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
+import googleapiclient.discovery
+
 
 from flask import render_template, redirect, Flask, session, jsonify, url_for, request
 import flask 
@@ -33,6 +35,27 @@ app.secret_key = FLASK_SECRET
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route('/test')
+def test_api_request():
+  if 'credentials' not in flask.session:
+    return flask.redirect('authorize')
+
+  # Load credentials from the session.
+  credentials = google.oauth2.credentials.Credentials(
+      **flask.session['credentials'])
+
+  drive = googleapiclient.discovery.build(
+      API_SERVICE_NAME, API_VERSION, credentials=credentials)
+
+  files = drive.files().list().execute()
+
+  # Save credentials back to session in case access token was refreshed.
+  # ACTION ITEM: In a production app, you likely want to save these
+  #              credentials in a persistent database instead.
+  flask.session['credentials'] = credentials_to_dict(credentials)
+
+  return flask.jsonify(**files)
 
 #for documentation on google login go to:
 #https://developers.google.com/identity/protocols/oauth2/web-server#python
@@ -74,29 +97,49 @@ def oauth2callback():
 
     return redirect(url_for('index'))
 
+@app.route('/logout', methods=['GET', 'POST'])
+def logOut():
+  if 'credentials' not in session:
+    return ('You need to <a href="/authorize">authorize</a> before ' +
+            'testing the code to revoke credentials.')
+
+  credentials = google.oauth2.credentials.Credentials(
+    **session['credentials'])
+
+  revoke = requests.post('https://oauth2.googleapis.com/revoke',
+      params={'token': credentials.token},
+      headers = {'content-type': 'application/x-www-form-urlencoded'})
+
+  status_code = getattr(revoke, 'status_code')
+  if status_code == 200:
+    return('Credentials successfully revoked.' + print_index_table())
+  else:
+    return('An error occurred.' + print_index_table())
+
 @app.route('/revoke')
 def revoke():
-    if 'credentials' not in session:
-        return ('You need to <a href="/authorize">authorize</a> before testing the code to revoke credentials.')
+  if 'credentials' not in session:
+    return ('You need to <a href="/authorize">authorize</a> before ' +
+            'testing the code to revoke credentials.')
 
-    credentials = google.oauth2.credentials.Credentials(
-        **session['credentials']
-    )
+  credentials = google.oauth2.credentials.Credentials(
+    **session['credentials'])
 
-    revoke = requests.post('https://oauth2.googleapis.com/revoke',
-                           params={'token': credentials.token},
-                           headers= {'content-type': 'application/x-www-form-urlencoded'})
-    status_code = getattr(revoke, 'status_code')
-    if status_code == 200:
-        return ('Credentials successfully revoken.' + print_index_table())
-    else:
-        return ('An error occurred.' + print_index_table())
+  revoke = requests.post('https://oauth2.googleapis.com/revoke',
+      params={'token': credentials.token},
+      headers = {'content-type': 'application/x-www-form-urlencoded'})
+
+  status_code = getattr(revoke, 'status_code')
+  if status_code == 200:
+    return('Credentials successfully revoked.' + print_index_table())
+  else:
+    return('An error occurred.' + print_index_table())
     
-@app.route('/clear')
+@app.route('/clear', methods=['POST', 'GET'])
 def clear_credentials():
     if 'credentials' in session:
         del session['credentials']
-    return ('Credentials have been cleared. <br><br>'+print_index_table())
+    return redirect(url_for('index'))
     
 def credentials_to_dict(credentials):
     return {'token': credentials.token,
@@ -140,11 +183,11 @@ def add():
         if request.method=='POST':
             title = request.form['title']
             time = request.form['time']
-            add_event(creds, title, time)
+            result = add_event(creds, title, time)
             print('added')
-            return render_template('index.html', result = 'success')
+            return render_template('index.html', result = result)
         else:
-            return render_template('index.html', result = 'fail')
+            return render_template('index.html', result = result)
     else:
         return redirect(url_for('authorize'))
 
@@ -193,7 +236,7 @@ def add_event(creds, title: str, duration_split: int) -> str:
 
         event = service.events().insert(calendarId='primary', body=event).execute()
         # return (f'Event created:\nTime: {start_time}-{end_time}\nName: {title}\nLink: {event.get("htmlLink")}')
-        return (f'event created: {event}')
+        return (f'{title} scheduled for {start_time} - {end_time}')
     except HttpError as error:
         print(f"An error occurred in add_event: {error}")
 

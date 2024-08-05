@@ -4,36 +4,85 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Later! extension</title>
-    <link
-      href="{{url_for('static', filename='styles/style.css')}}"
-      rel="stylesheet"
-    />
+    <link rel="stylesheet" type="text/css" href="../static/css/style.css" />
   </head>
   <body>
-    <h1>Later! extension</h1>
-    <!-- session status -->
-     <div name="session">
-      {% if session %}
-      <div><pre>{{pretty}}</pre></div>
-      {% else %}
-      <p><a href="{{url_for('authorize')}}">Login with Google</a></p>
-      {% endif %}
-     </div>
-     
-    <!-- event adder element -->
-    <form action="/add" method="post">
-      <input type="text" name="title" id="title" placeholder="Enter a title" />
-      <input
-        type="text"
-        name="time"
-        id="time"
-        placeholder="Enter duration of task"
-      />
-      <input type="submit" value="Submit" />
-      <p id="result"></p>
-    </form>
+    <div class="header">
+      <h1>bite size scheduler</h1>
+
+      <!-- session status -->
+      <div name="session">
+        {% if 'credentials' in session %}
+        <div class="welcome_message" id="welcome_message"></div>
+        {% else %}
+        <p class="Login">
+          <a href="{{url_for('authorize')}}">Login with Google</a>
+        </p>
+        {% endif %}
+      </div>
+      <a class="logout" href="http://localhost:8080/clear">logout</a>
+
+    </div>
+
+    <div class="inputs">
+      <!-- event adder element -->
+      <form action="/add" method="post">
+        <div class="title">
+          <input
+            type="text"
+            name="title"
+            id="title"
+            placeholder="Enter a title"
+          />
+        </div>
+        <div class="time">
+          <input
+            type="text"
+            name="time"
+            id="time"
+            placeholder="Enter duration of task"
+          />
+        </div>
+        <div class="submit_btn">
+          <input type="submit" value="Submit" />
+        </div>
+      </form>
+    </div>
+
+    <p id="result"></p>
+
+    <footer class="footer">
+      <div class="contact-info">
+        <p>
+          Contact us at: <a href="mailto:info@example.com">info@bitesize.net</a>
+        </p>
+        <p>Phone: +1 234 567 890</p>
+      </div>
+
+      <div class="social-media">
+        <a href="https://www.facebook.com" target="_blank">Facebook</a>
+        <a href="https://www.twitter.com" target="_blank">Twitter</a>
+        <a href="https://www.instagram.com" target="_blank">Instagram</a>
+      </div>
+
+      <div class="nav-links">
+        <a href="/about">About Us</a>
+        <a href="/services">Services</a>
+        <a href="/contact">Contact</a>
+      </div>
+
+      <p>&copy; 2024 bite size. All rights reserved.</p>
+    </footer>
     <script>
       document.getElementById("result").innerHTML = "{{result}}";
+    </script>
+    <script>
+      const message = `Welcome to bite size! 🎉
+
+Hey there, go-getter! Welcome to bite size, where we turn your to-do lists into "done" lists. Say goodbye to procrastination and hello to productivity! 🗓️✨
+
+With bite size, you can effortlessly schedule your tasks and watch as we organize your day like a pro. No more excuses, just seamless scheduling and sweet, sweet accomplishment. Let's get those tasks tackled, one awesome day at a time. Ready to conquer your schedule? Let's go! 🚀💪`;
+      document.getElementById("welcome_message").innerHTML = message;
     </script>
   </body>
 </html>
