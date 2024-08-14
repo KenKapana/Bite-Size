@@ -10,8 +10,7 @@ import google.oauth2.credentials
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
 
-
-from flask import render_template, redirect, Flask, session, jsonify, url_for, request
+from flask import render_template, redirect, Flask, session, url_for, request
 import flask 
 import requests
 
@@ -34,7 +33,7 @@ app.secret_key = FLASK_SECRET
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", result='')
 
 @app.route('/test')
 def test_api_request():
@@ -184,44 +183,50 @@ def add():
             title = request.form['title']
             time = request.form['time']
             result = add_event(creds, title, time)
-            print('added')
-            return render_template('index.html', result = result)
+            return render_template('index.html', result=result)
         else:
-            return render_template('index.html', result = result)
+            return render_template('index.html', result='uh oh, something went wrong')
     else:
         return redirect(url_for('authorize'))
 
-    # if request.method=='POST':
-    #     creds = get_token_file_path(session['user_id'])
-    #     title = request.form['title']
-    #     time = request.form['time']
-    #     add_event(creds, title, time)
-    #     print('added')
-    # return render_template('index.html', result = 'added')
 
-
-def add_event(creds, title: str, duration_split: int) -> str:
+def add_event(creds, title: str, duration: int) -> str:
     """
     Add an event to the user's Google Calendar.
     """
-    duration_split = int(duration_split)
-    #splits work time if over 7 hours long
-    if int(duration_split) > 7:
-        duration_split = duration_split // 7  # 7 = days in a week
-
-    #finds starting time for task to fit in schedule
-    event_start = time_window(creds, duration_split)
-
     try:
         service = build("calendar", "v3", credentials=creds)
+    except HttpError as error:
+        print(f"An error occurred in add_event: {error}")
 
-        open_hour = int(event_start)
-        # print(open_hour)
+    #for now one hour each tasks
+    #now is formatted like: class datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)
+    #but for the future, time_window can find slots for duration longer than 1 hour
+    for loop in range(int(duration)+1):
 
-        today = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
-        start_time = today.replace(hour=open_hour, minute=0, second=0, microsecond=0)
-        end_time = start_time + datetime.timedelta(hours=duration_split)
+        now = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
+        now = now.replace(minute=0, second=0, microsecond=0)
+        now+= datetime.timedelta(days=loop)
+        #decides which hour to start
+        #if today hour is not replaced, but future dates have 0 as their hours
+        if loop==0:
+           event_start_hour = time_window(creds, 1, int(now.day), True)
 
+        else:
+            now = now.replace(hour=0)
+            event_start_hour = time_window(creds, 1, int(now.day+loop), False)
+
+        #if there's not enough time today to fit the task
+        #loops thru the days until it finds an open spot
+        while event_start_hour == -1:
+            now += datetime.timedelta(days=1)
+            event_start_hour = time_window(creds, 1, now.day, False)
+
+        start_time = now.replace(hour=event_start_hour)
+
+        event_end = start_time.replace(hour=(start_time.hour+1))
+
+        #calls google api
         event = {
             'summary': title,
             'start': {
@@ -229,79 +234,70 @@ def add_event(creds, title: str, duration_split: int) -> str:
                 'timeZone': 'America/Los_Angeles',
             },
             'end': {
-                'dateTime': end_time.isoformat(),
+                'dateTime': event_end.isoformat(),
                 'timeZone': 'America/Los_Angeles',
             },
         }
-
         event = service.events().insert(calendarId='primary', body=event).execute()
-        # return (f'Event created:\nTime: {start_time}-{end_time}\nName: {title}\nLink: {event.get("htmlLink")}')
-        return (f'{title} scheduled for {start_time} - {end_time}')
-    except HttpError as error:
-        print(f"An error occurred in add_event: {error}")
-
-# If modifying these scopes, delete the file token.json.
-# SCOPES = ['https://www.googleapis.com/auth/calendar']
-
-
     
+    return 'events added'
 
-def time_window(creds, duration_of_task: int):
+
+def time_window(creds, duration_of_task: int, date: int, keep_hour: bool):
     """
     finds an open window for select duration of time and returns the starting time
     creates based on current hour and goes up by the hour
     """
     try:
-        # Call the Calendar API for current time
+        
+        #now is formatted like: class datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)
         now = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
-        start_time = now.replace(minute=0, second=0, microsecond=0)
+        if keep_hour:
+            now = now.replace(day=date, minute=0, second=0, microsecond=0)
+        else:
+            now = now.replace(day=date,hour=0, minute=0, second=0, microsecond=0)
 
-        occupied_time = get_event_durations(creds)
-        opening_found = False
-        time_frame = 0
-        start = -1
-        for hour in range(start_time.hour+1, 24):
-            if time_frame == duration_of_task and opening_found == True:
-                # print('done')
-                return start
+        occupied_time = get_event_durations(creds, date)
+        #two pointer to find open slot of time
+        #beginning starts from current hour plus one
+        beginning=now.hour+1
+        #end, the second of the two pointer, will start at the same point as beginning
+        end=beginning
 
-            if (hour not in occupied_time) and opening_found == False:
-                # print('found opening')
-                start = hour
-                opening_found = True
-                time_frame += 1
+        #hours in a day
+        hours_in_a_day = 24
 
-            elif hour in occupied_time and opening_found == True:
-                # print('closed before time fulfilled')
-                start = -1
-                time_frame=0
-                opening_found = False
-                
-            elif hour not in occupied_time and opening_found==True:
-                # print('still open')
-                time_frame += 1
+        while end<=hours_in_a_day:
+            if end in occupied_time or beginning in occupied_time:
+               beginning=end
+            elif (end-beginning)==duration_of_task:
+                return beginning
+            end+=1
 
-            # else:
-            #     print('booked')
-            
-        return start
+        #if no slots are open today -1 is returned
+        return -1
+                 
     except HttpError as error:
         print(f'An error occurred: {error}')
         return -1
 
-def get_event_durations(creds, calendar_id='primary'):
+def get_event_durations(creds, day: int, calendar_id='primary') -> dict:
     try:
+        #calls google calendar api
         service = build('calendar', 'v3', credentials=creds)
 
-        # Call the Calendar API
+        #creates time frame to check for events
+        #now is formatted like: class datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)
+
         now = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
-        start_of_hour = now.replace(minute=0, second=0, microsecond=0)
+        start_of_hour = now.replace(day=day, minute=0, second=0, microsecond=0)
         end_of_hour = now.replace(hour=23, minute=59, second=59)
 
+        #format
         timeMin = start_of_hour.isoformat()
         timeMax = end_of_hour.isoformat()
-        # print(timeMin, timeMax)
-        # print('Getting events from the current hour')
+        
+        #gets list of events
         events_result = service.events().list(
             calendarId=calendar_id,
             timeMin=timeMin,
@@ -311,35 +307,31 @@ def get_event_durations(creds, calendar_id='primary'):
         ).execute()
         events = events_result.get('items', [])
 
+        #for clear schedule
         if not events:
-            # print('No events found for the current hour.')
-            return []
+            return {}
 
-        event_details = []
+        #creates dict of event times
+        #the value is the title and the key is the hour of the day
         occupied_time = {}
+
+        #this loop goes thru each event of today
         for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            end = event['end'].get('dateTime', event['end'].get('date'))
+            start = event['start'].get('dateTime')
+            end = event['end'].get('dateTime')
+
+            #gets title to save as value for the dictionary
             summary = event.get('summary')
 
-            # print(f"Event: {summary}, Start: {start}, End: {end}")
-            event_details.append((summary, start, end))
-
-            # duration = end_time - start_time
-            # event_durations.append(duration.total_seconds() / 3600)  # Convert duration to hours
-            # print(f"Event: {summary}, Start: {start}, End: {end}, Duration: {duration}")
-            # print(end_time.hour, start_time.hour)
-
-            # creating dictionary of filled schedule
             event_start = datetime.datetime.fromisoformat(start).hour
             event_end = datetime.datetime.fromisoformat(end).hour
             
-            # print('start: ', event_start, 'end: ', event_end)
+            #this loop appends the events hours to the dict
             for i in range(event_start, event_end):
                 # print('im in loop lol', i)
                 occupied_time[i] = summary
 
-        # print(event_details)
+        print(occupied_time)
         return occupied_time
 
     except HttpError as error:
@@ -351,6 +343,5 @@ def get_event_durations(creds, calendar_id='primary'):
 
 
 if __name__ == "__main__":
-    # main()
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
     app.run('localhost', 8080, debug=True)
