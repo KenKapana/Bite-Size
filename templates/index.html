@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Later! extension</title>
+    <title>Bite-Size</title>
     <link rel="stylesheet" type="text/css" href="../static/css/style.css" />
   </head>
   <body>
     <div class="header">
-      <h1><a href='/' style="text-decoration: none">bite size scheduler</a></h1>
+      <h1><a href="/" style="text-decoration: none">bite size scheduler</a></h1>
 
       <!-- session status -->
       <div name="session">
@@ -21,35 +21,63 @@
         {% endif %}
       </div>
       <a class="logout" href="http://localhost:8080/clear">logout</a>
-
     </div>
 
     <div class="inputs">
       <!-- event adder element -->
       <form action="/add" method="post">
-        <div class="title">
-          <input
-            type="text"
-            name="title"
-            id="title"
-            placeholder="Enter a title"
-          />
-        </div>
-        <div class="time">
-          <input
-            type="text"
-            name="time"
-            id="time"
-            placeholder="Enter duration of task to split up"
-          />
-        </div>
-        <div class="submit_btn">
-          <input type="submit" value="Submit" />
-        </div>
+        <input
+          placeholder="Title your task"
+          type="text"
+          id="title"
+          name="title"
+          required
+        />
+        <br />
+        <input
+          placeholder="How long will this take?"
+          type="number"
+          id="duration"
+          name="duration"
+          required
+        />
+        <br />
+        <!-- Two submit buttons -->
+        <button class="add_now" type="submit" name="action" value="add_now">
+          add now
+        </button>
+        <button class="add_later" type="submit" name="action" value="add_later">
+          add later
+        </button>
       </form>
     </div>
 
     <p id="result"></p>
+
+    <!-- todo list component -->
+    <h1 class="todo_title">TO Do's</h1>
+    <div class="todo">
+      <ul>
+        {% if data %} {% for key, value in data.items() %}
+
+        <li class="bullet_point">
+          <form action="/delete_data/{{ key }}" method="post">
+            <button class="delete_btn" type="submit">
+              {{ value.get('title') }} ---- {{ value.get('duration') }} hours
+            </button>
+          </form>
+        </li>
+        <form
+          action="/add_now/{{key}}/{{ value.get('title')}}/{{value.get('duration')}}"
+          method="post"
+        >
+          <button class="add_btn" type="submit">add!</button>
+        </form>
+        {% else %}
+        <li>No data available</li>
+        {% endfor %} {% endif %}
+      </ul>
+    </div>
 
     <footer class="footer">
       <div class="contact-info">
@@ -73,6 +101,7 @@
 
       <p>&copy; 2024 bite size. All rights reserved.</p>
     </footer>
+
     <script>
       document.getElementById("result").innerHTML = "{{result}}";
     </script>

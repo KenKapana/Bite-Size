@@ -10,16 +10,19 @@ import google.oauth2.credentials
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
 
-from flask import render_template, redirect, Flask, session, url_for, request
+from flask import render_template, redirect, Flask, session, url_for, request, jsonify
 import flask 
 import requests
+
+import firebase_admin
+from firebase_admin import credentials, db
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
 CLIENT_SECRETS_FILE = "credentials.json"
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
+SCOPES = ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/userinfo.email", "openid"]
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 CLIENT_ID=os.getenv("API_CLIENT_ID")
 FLASK_SECRET=os.getenv("FLASK_SECRET")
@@ -31,9 +34,114 @@ API_VERSION = 'v2'
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET
 
+firebase_cred = credentials.Certificate('firebase_credentials.json')
+
+firebase_admin.initialize_app(firebase_cred, {
+    'databaseURL': "https://bite-size-59972-default-rtdb.firebaseio.com"
+})
+
+def clean_email(email):
+   return email.replace('.', ',')
+
+def get_email():
+    # Use the stored credentials to access the user's profile
+    credentials = google.oauth2.credentials.Credentials(**session['credentials'])
+
+    userinfo_endpoint = 'https://www.googleapis.com/oauth2/v1/userinfo'
+    headers = {'Authorization': f'Bearer {credentials.token}'}
+    
+    response = requests.get(userinfo_endpoint, headers=headers)
+    user_info = response.json()
+
+    # Extract the email from the user info
+    email = user_info.get('email')
+
+    # Optionally, store the email in Firebase or perform another action
+    # For now, return the email as a response
+    print(email)
+    return email
+
+def is_user_logged_in():
+    # Check if the credentials are in the session
+    if 'credentials' not in session:
+        return False
+    
+    # Load the credentials from the session
+    credentials = google.oauth2.credentials.Credentials(**session['credentials'])
+    
+    # Check if the credentials are valid and not expired
+    if credentials and credentials.valid:
+        return True
+    
+    # If the credentials have expired, try to refresh them
+    if credentials and credentials.expired and credentials.refresh_token:
+        try:
+            credentials.refresh(google.auth.transport.requests.Request())
+            # Update the session with the new credentials
+            session['credentials'] = {
+                'token': credentials.token,
+                'refresh_token': credentials.refresh_token,
+                'token_uri': credentials.token_uri,
+                'client_id': credentials.client_id,
+                'client_secret': credentials.client_secret,
+                'scopes': credentials.scopes
+            }
+            return True
+        except Exception as e:
+            print(f"Error refreshing credentials: {e}")
+            return False
+    
+    return False
+
 @app.route("/")
 def index():
-    return render_template("index.html", result='')
+    if 'credentials' in session:
+        email = get_email()
+        print('what the fuck is wrong with you ', email)
+        if email!=None:
+            cleaned_email = clean_email(email)
+            ref = db.reference(f'/clients/{cleaned_email}')
+            data = ref.get()
+            return render_template("index.html", result='', data=data)
+    else:
+        return render_template("index.html", result='')
+
+@app.route("/add", methods=['POST'])
+def add():
+    title = request.form['title']
+    duration = request.form['duration']
+    action = request.form['action']
+
+    if action == 'add_now':
+        return redirect(url_for('add_now', title=title, duration=int(duration)))
+    elif action == 'add_later':
+        return redirect(url_for('add_later', title=title, duration=int(duration)))
+
+@app.route('/delete_data/<key>', methods=['POST'])
+def delete_data(key):
+    email = get_email()
+    cleaned_email = clean_email(email)
+    # Reference to the Firebase Realtime Database path for the specific entry
+    ref = db.reference(f'/clients/{cleaned_email}/{key}')
+    
+    # Delete the data
+    ref.delete()
+    
+    # Redirect back to the data list page
+    return redirect(url_for('index'))
+
+@app.route('/add_now/<key>/<title>/<duration>', methods=['POST'])
+def add_now_from_todo(key, title, duration):
+    email = get_email()
+    cleaned_email = clean_email(email)
+    # Reference to the Firebase Realtime Database path for the specific entry
+    ref = db.reference(f'/clients/{cleaned_email}/{key}')
+    
+    # Delete the data
+    ref.delete()
+   
+    title = title.replace('%20', ' ')
+    return redirect(url_for('add_now', title=title, duration=duration))
 
 @app.route('/test')
 def test_api_request():
@@ -56,9 +164,50 @@ def test_api_request():
 
   return flask.jsonify(**files)
 
+@app.route('/add_later', methods=['GET', 'POST'])
+def add_later():
+    title = request.args.get('title')
+    duration = request.args.get('duration')
+
+    email = get_email()
+    cleaned_email = clean_email(email)
+    data = {"title": title, "duration": duration}
+
+    user_ref = db.reference(f'/clients/{cleaned_email}')
+    user_data = user_ref.get()
+    
+    if user_data:
+       new_data_ref = user_ref.push()
+       new_data_ref.set(data)
+    else:
+       user_ref.set({"data":data})
+    
+    data = user_ref.get()
+    return render_template('index.html', data=data)
+
+    # Check if credentials are in session
+    if 'credentials' not in session:
+        return redirect(url_for('authorize'))
+
+    # Use the stored credentials to access the user's profile
+    credentials = google.oauth2.credentials.Credentials(**session['credentials'])
+
+    userinfo_endpoint = 'https://www.googleapis.com/oauth2/v1/userinfo'
+    headers = {'Authorization': f'Bearer {credentials.token}'}
+    
+    response = requests.get(userinfo_endpoint, headers=headers)
+    user_info = response.json()
+
+    # Extract the email from the user info
+    email = user_info.get('email')
+
+    # Optionally, store the email in Firebase or perform another action
+    # For now, return the email as a response
+    print(email)
+    return email
+
 #for documentation on google login go to:
 #https://developers.google.com/identity/protocols/oauth2/web-server#python
-
 @app.route("/authorize")
 def authorize():
     flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
@@ -170,22 +319,26 @@ def print_index_table():
           '</td></tr></table>')
 
 
-@app.route('/add', methods=['GET', 'POST'])
-def add():
+@app.route('/add_now')
+def add_now():
     if 'credentials' in session:
 
         creds = google.oauth2.credentials.Credentials(
             **session['credentials']
         )
         print(creds)
-        
-        if request.method=='POST':
-            title = request.form['title']
-            time = request.form['time']
-            result = add_event(creds, title, time)
-            return render_template('index.html', result=result)
-        else:
-            return render_template('index.html', result='uh oh, something went wrong')
+        title = request.args.get('title')
+        duration = request.args.get('duration')
+        result = add_event(creds, title, duration)
+        return redirect(url_for('index', result='success'))
+    
+    #     if request.method=='POST':
+    #         title = request.form['title']
+    #         time = request.form['time']
+    #         result = add_event(creds, title, time)
+    #         return render_template('index.html', result=result)
+    #     else:
+    #         return render_template('index.html', result='uh oh, something went wrong')
     else:
         return redirect(url_for('authorize'))
 
@@ -199,32 +352,37 @@ def add_event(creds, title: str, duration: int) -> str:
     except HttpError as error:
         print(f"An error occurred in add_event: {error}")
 
+    now = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
+    now = now.replace(minute=0, second=0, microsecond=0)
+
+    duration = int(duration)
+    days_passed = 0
+    events_added = 0
     #for now one hour each tasks
     #now is formatted like: class datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)
     #but for the future, time_window can find slots for duration longer than 1 hour
-    for loop in range(int(duration)+1):
+    while events_added < duration:
 
-        now = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
-        now = now.replace(minute=0, second=0, microsecond=0)
-        now+= datetime.timedelta(days=loop)
+        cur = now + datetime.timedelta(days=days_passed)
         #decides which hour to start
         #if today hour is not replaced, but future dates have 0 as their hours
-        if loop==0:
-           event_start_hour = time_window(creds, 1, int(now.day), True)
+        if days_passed==0:
+           event_start_hour = time_window(creds, 1, cur)
 
         else:
-            now = now.replace(hour=0)
-            event_start_hour = time_window(creds, 1, int(now.day+loop), False)
+            cur = cur.replace(hour=0)
+            event_start_hour = time_window(creds, 1, cur)
 
         #if there's not enough time today to fit the task
         #loops thru the days until it finds an open spot
         while event_start_hour == -1:
-            now += datetime.timedelta(days=1)
-            event_start_hour = time_window(creds, 1, now.day, False)
+            cur += datetime.timedelta(days=1)
+            days_passed+=1
+            event_start_hour = time_window(creds, 1, cur)
 
-        start_time = now.replace(hour=event_start_hour)
+        start_time = cur.replace(hour=event_start_hour)
 
-        event_end = start_time.replace(hour=(start_time.hour+1))
+        event_end = start_time+datetime.timedelta(hours=1)
 
         #calls google api
         event = {
@@ -239,38 +397,36 @@ def add_event(creds, title: str, duration: int) -> str:
             },
         }
         event = service.events().insert(calendarId='primary', body=event).execute()
-    
-    return 'events added'
+        events_added+=1
+        days_passed+=1
+
+    return title
 
 
-def time_window(creds, duration_of_task: int, date: int, keep_hour: bool):
+def time_window(creds, duration_of_task: int, cur_date: datetime):
     """
     finds an open window for select duration of time and returns the starting time
     creates based on current hour and goes up by the hour
     """
     try:
         
-        #now is formatted like: class datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)
-        now = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
-        if keep_hour:
-            now = now.replace(day=date, minute=0, second=0, microsecond=0)
-        else:
-            now = now.replace(day=date,hour=0, minute=0, second=0, microsecond=0)
-
-        occupied_time = get_event_durations(creds, date)
+        #datetime is formatted like: class datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)
+        occupied_time = get_event_durations(creds, cur_date)
         #two pointer to find open slot of time
         #beginning starts from current hour plus one
-        beginning=now.hour+1
+        cur_hour = cur_date.hour
+        beginning=cur_hour+1
         #end, the second of the two pointer, will start at the same point as beginning
         end=beginning
 
         #hours in a day
         hours_in_a_day = 24
 
-        while end<=hours_in_a_day:
+        while end<hours_in_a_day:
             if end in occupied_time or beginning in occupied_time:
                beginning=end
             elif (end-beginning)==duration_of_task:
+                print('beginning found:', beginning)
                 return beginning
             end+=1
 
@@ -281,7 +437,7 @@ def time_window(creds, duration_of_task: int, date: int, keep_hour: bool):
         print(f'An error occurred: {error}')
         return -1
 
-def get_event_durations(creds, day: int, calendar_id='primary') -> dict:
+def get_event_durations(creds, cur_date: datetime, calendar_id='primary') -> dict:
     try:
         #calls google calendar api
         service = build('calendar', 'v3', credentials=creds)
@@ -289,9 +445,8 @@ def get_event_durations(creds, day: int, calendar_id='primary') -> dict:
         #creates time frame to check for events
         #now is formatted like: class datetime.datetime(year, month, day, hour=0, minute=0, second=0, microsecond=0, tzinfo=None, *, fold=0)
 
-        now = datetime.datetime.now(tz=pytz.timezone('America/Los_Angeles'))
-        start_of_hour = now.replace(day=day, minute=0, second=0, microsecond=0)
-        end_of_hour = now.replace(hour=23, minute=59, second=59)
+        start_of_hour = cur_date.replace(minute=0, second=0, microsecond=0)
+        end_of_hour = cur_date.replace(hour=23, minute=59, second=59)
 
         #format
         timeMin = start_of_hour.isoformat()
