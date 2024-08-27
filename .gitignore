@@ -1,6 +1,5 @@
 .venv
 .env
 credentials.json
-package.json
-package-lock.json
 firebase_credentials.json
+node_modules
