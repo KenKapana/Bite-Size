@@ -136,6 +136,23 @@
   background-color: #f8d7da;
   cursor: pointer;
 }
+.add_btn {
+  display: flex;
+  margin: auto;
+  width: 100px;
+  align-items: center;
+  justify-content: center;
+  height: 20px; /* Set the desired height */
+  padding: 10px; /* Add padding for better appearance */
+  font-size: 15px; /* Increase font size */
+  border: 2px solid #ccc; /* Add a border */
+  border-radius: 5px; /* Optional: add rounded corners */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Optional: add a subtle shadow */
+}
+.add_btn:hover{
+  color:#b393d3;
+  cursor: pointer;
+}
 
 
 

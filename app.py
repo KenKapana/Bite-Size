@@ -40,6 +40,20 @@ firebase_admin.initialize_app(firebase_cred, {
     'databaseURL': "https://bite-size-59972-default-rtdb.firebaseio.com"
 })
 
+@app.route("/")
+def index():
+    if 'credentials' in session:
+        email = get_email()
+        print('what the fuck is wrong with you ', email)
+        if email!=None:
+            cleaned_email = clean_email(email)
+            ref = db.reference(f'/clients/{cleaned_email}')
+            data = ref.get()
+            return render_template("index.html", result='', data=data)
+    else:
+        return render_template("index.html", result='')
+
+
 def clean_email(email):
    return email.replace('.', ',')
 
@@ -92,19 +106,6 @@ def is_user_logged_in():
             return False
     
     return False
-
-@app.route("/")
-def index():
-    if 'credentials' in session:
-        email = get_email()
-        print('what the fuck is wrong with you ', email)
-        if email!=None:
-            cleaned_email = clean_email(email)
-            ref = db.reference(f'/clients/{cleaned_email}')
-            data = ref.get()
-            return render_template("index.html", result='', data=data)
-    else:
-        return render_template("index.html", result='')
 
 @app.route("/add", methods=['POST'])
 def add():
