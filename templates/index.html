@@ -23,36 +23,69 @@
       <a class="logout" href="http://localhost:8080/clear">logout</a>
     </div>
 
+    <p class="down_time">
+      down time: <br />
+      {{selected_hours}}
+    </p>
+
     <!-- event adder element -->
     <div class="inputs">
-      <form action="/add" method="post">
-        <input
-          placeholder="Title your task"
-          type="text"
-          id="title"
-          name="title"
-          required
-        />
-        <br />
-        <input
-          placeholder="How long will this take?"
-          type="number"
-          id="duration"
-          name="duration"
-          required
-        />
-        <br />
-        <!-- Two submit buttons -->
-        <button class="add_now" type="submit" name="action" value="add_now">
-          add now
-        </button>
-        <button class="add_later" type="submit" name="action" value="add_later">
-          add later
-        </button>
-      </form>
-    </div>
+      <div class="task_time_input">
+        <!-- shows downtime in session -->
+        <form action="/add" method="post">
+          <input
+            placeholder="Title your task"
+            type="text"
+            id="title"
+            name="title"
+            required
+          />
+          <br />
+          <input
+            placeholder="How long will this take?"
+            type="number"
+            id="duration"
+            name="duration"
+            required
+          />
+          <br />
+          <!-- Two submit buttons -->
+          <button class="add_now" type="submit" name="action" value="add_now">
+            add now
+          </button>
+          <button
+            class="add_later"
+            type="submit"
+            name="action"
+            value="add_later"
+          >
+            add later
+          </button>
+        </form>
+      </div>
 
-    <p id="result"></p>
+      <!-- checkboxes for busy hours -->
+      <div class="advanced_input">
+        <form action="/submit_hours" method="POST">
+          <div class="dropdown">
+            <button type="button" class="dropdown_toggle">
+              Avoid these hours ~_~
+            </button>
+            <div class="dropdown_content">
+              <!-- Fixed class name -->
+              {% for hour in range(24) %}
+              <label>
+                <input type="checkbox" name="hours" value="{{ hour }}" /> {{
+                hour }} </label
+              ><br />
+              {% endfor %}
+              <button type="submit">Submit</button>
+            </div>
+          </div>
+          <br />
+        </form>
+      </div>
+    </div>
 
     <!-- todo list component -->
     <h1 class="todo_title">TO Do's</h1>
@@ -102,16 +135,6 @@
       <p>&copy; 2024 bite size. All rights reserved.</p>
     </footer>
 
-    <script>
-      document.getElementById("result").innerHTML = "{{result}}";
-    </script>
-    <script>
-      const message = `Welcome to bite size! 🎉
-
-Hey there, go-getter! Welcome to bite size, where we turn your to-do lists into "done" lists. Say goodbye to procrastination and hello to productivity! 🗓️✨
-
-With bite size, you can effortlessly schedule your tasks and watch as we organize your day like a pro. No more excuses, just seamless scheduling and sweet, sweet accomplishment. Let's get those tasks tackled, one awesome day at a time. Ready to conquer your schedule? Let's go! 🚀💪`;
-      document.getElementById("welcome_message").innerHTML = message;
-    </script>
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
   </body>
 </html>

@@ -45,13 +45,16 @@ def index():
     if 'credentials' in session:
         email = get_email()
         print('what the fuck is wrong with you ', email)
-        if email!=None:
-            cleaned_email = clean_email(email)
-            ref = db.reference(f'/clients/{cleaned_email}')
-            data = ref.get()
-            return render_template("index.html", result='', data=data)
+        cleaned_email = clean_email(email)
+        ref = db.reference(f'/clients/{cleaned_email}')
+        data = ref.get()
+        if 'selected_hours' in session:
+            down_time = session['selected_hours']
+        else:
+            down_time = None
+        return render_template("index.html", data=data, selected_hours=down_time)
     else:
-        return render_template("index.html", result='')
+        return render_template("index.html")
 
 
 def clean_email(email):
@@ -60,6 +63,8 @@ def clean_email(email):
 def get_email():
     # Use the stored credentials to access the user's profile
     credentials = google.oauth2.credentials.Credentials(**session['credentials'])
+    if credentials==None:
+        return redirect(url_for("authorize"))
 
     userinfo_endpoint = 'https://www.googleapis.com/oauth2/v1/userinfo'
     headers = {'Authorization': f'Bearer {credentials.token}'}
@@ -143,6 +148,21 @@ def add_now_from_todo(key, title, duration):
    
     title = title.replace('%20', ' ')
     return redirect(url_for('add_now', title=title, duration=duration))
+
+@app.route('/submit_hours', methods=['POST'])
+def submit_hours():
+    selected_hours = request.form.getlist('hours')
+    selected_hours = list(map(int, selected_hours))
+
+    session['selected_hours'] = selected_hours
+    session['update_successful'] = True
+
+    return redirect(url_for('index'))
+
+@app.route('/check_update_success')
+def check_update_success():
+    update_successful = session.pop('update_successful', False)
+    return jsonify({'update_successful': update_successful})
 
 @app.route('/test')
 def test_api_request():
@@ -438,7 +458,7 @@ def time_window(creds, duration_of_task: int, cur_date: datetime):
         print(f'An error occurred: {error}')
         return -1
 
-def get_event_durations(creds, cur_date: datetime, calendar_id='primary') -> dict:
+def get_event_durations(creds, cur_date: datetime, calendar_id='primary') -> list:
     try:
         #calls google calendar api
         service = build('calendar', 'v3', credentials=creds)
@@ -465,19 +485,16 @@ def get_event_durations(creds, cur_date: datetime, calendar_id='primary') -> dic
 
         #for clear schedule
         if not events:
-            return {}
+            return []
 
         #creates dict of event times
         #the value is the title and the key is the hour of the day
-        occupied_time = {}
+        occupied_time = []
 
         #this loop goes thru each event of today
         for event in events:
             start = event['start'].get('dateTime')
             end = event['end'].get('dateTime')
-
-            #gets title to save as value for the dictionary
-            summary = event.get('summary')
 
             event_start = datetime.datetime.fromisoformat(start).hour
             event_end = datetime.datetime.fromisoformat(end).hour
@@ -485,8 +502,9 @@ def get_event_durations(creds, cur_date: datetime, calendar_id='primary') -> dic
             #this loop appends the events hours to the dict
             for i in range(event_start, event_end):
                 # print('im in loop lol', i)
-                occupied_time[i] = summary
-
+                occupied_time.append(i)
+        down_time = session['selected_hours']
+        occupied_time.extend(down_time)
         print(occupied_time)
         return occupied_time
 

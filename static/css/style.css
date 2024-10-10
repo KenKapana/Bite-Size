@@ -14,6 +14,7 @@
   background-color: #f7f7f7;
   text-align: center;
   height:auto;
+  padding: 20px;
 }
 
 .header > h1 > a{
@@ -29,13 +30,22 @@
 .inputs {
   display: flex;
   width: 100%;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background-color: #f7f7f7; /* Background color for the container */
-  height: 55vh; /* Full viewport height for demonstration */
+  height: 100vh; /* Full viewport height for demonstration */
+  position: relative;
+  box-sizing: border-box;
 }
 
-.inputs > form > button {
+.task_time_input {
+  flex-grow: 1;
+  height: 70vh;
+  max-width: 80%;
+  margin-right: 20px;
+}
+
+.task_time_input > form > button{
   display: flex;
   margin: auto;
   width: 300px;
@@ -49,7 +59,7 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Optional: add a subtle shadow */
 }
 
-.inputs > form > input {
+.task_time_input > form > input {
   display: flex;
   margin: auto;
   width: 300px; /* Set the desired width */
@@ -87,11 +97,55 @@
   width: auto;
   margin: auto;
 }
+
+/* Style the dropdown button */
+.advanced_input {
+  flex-shrink: 0;
+  width: 200px;
+  position: relative;
+  background-color: aquamarine;
+}
+
+.dropdown_toggle {
+  top: 100%;
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background-color: darkblue;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+/* Hide the dropdown content by default */
+.dropdown_content {
+  position: absolute;
+  width: 200px;
+  background-color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ccc;
+  z-index: 10; /* Ensures the dropdown stays above other elements */
+  display: none; /* Initially hidden */
+}
+
+/* Display checkboxes horizontally */
+.dropdown_content label {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+/* Show the dropdown content when the button is clicked */
+.dropdown.show .dropdown_content {
+  display: block;
+}
+
+
 /* todo list */
 .todo_title {
+  height: 20vh;
   display: flex;
-  margin: auto;
-  width: 150px;
+  margin-top: 10px;
+  width: auto;
   justify-content: center;
   align-items: center;
   color: #333;
