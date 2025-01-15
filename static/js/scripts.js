@@ -11,17 +11,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function toggle_dropdown() {
     const dropdownToggle = document.querySelector(".dropdown_toggle");
-    if (dropdownToggle) {
-        dropdownToggle.addEventListener("click", function () {
-            const dropdown = this.parentElement; // Get the dropdown content
-            if (dropdown) {
-                dropdown.classList.toggle("show");
-            }
-        });
-    } else {
-        console.error("Dropdown toggle button not found");
-    }
-}
+    const dropdownContent = document.querySelector(".dropdown_content");
+    
+    dropdownToggle.addEventListener('click', () => {
+      dropdownContent.classList.toggle('show');
+    });
+
+    window.addEventListener('click', (event) => {
+      if (!event.target.matches('.dropdown_toggle')) {
+        if (dropdownContent.classList.contains('show')) {
+          dropdownContent.classList.remove('show');
+        }
+      }
+    });
+  }
 
   // Set the welcome message in the element with id "welcome_message"
   const welcomeMessage = `Welcome to bite size! 🎉<br>
