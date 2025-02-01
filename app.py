@@ -44,7 +44,6 @@ firebase_admin.initialize_app(firebase_cred, {
 def index():
     if 'credentials' in session:
         email = get_email()
-        print('what the fuck is wrong with you ', email)
         cleaned_email = clean_email(email)
         ref = db.reference(f'/clients/{cleaned_email}')
         data = ref.get()
