@@ -205,26 +205,6 @@ def add_later():
     data = user_ref.get()
     return render_template('index.html', data=data)
 
-    # Check if credentials are in session
-    if 'credentials' not in session:
-        return redirect(url_for('authorize'))
-
-    # Use the stored credentials to access the user's profile
-    credentials = google.oauth2.credentials.Credentials(**session['credentials'])
-
-    userinfo_endpoint = 'https://www.googleapis.com/oauth2/v1/userinfo'
-    headers = {'Authorization': f'Bearer {credentials.token}'}
-    
-    response = requests.get(userinfo_endpoint, headers=headers)
-    user_info = response.json()
-
-    # Extract the email from the user info
-    email = user_info.get('email')
-
-    # Optionally, store the email in Firebase or perform another action
-    # For now, return the email as a response
-    print(email)
-    return email
 
 #for documentation on google login go to:
 #https://developers.google.com/identity/protocols/oauth2/web-server#python
@@ -397,6 +377,7 @@ def add_event(creds, title: str, duration: int) -> str:
         #loops thru the days until it finds an open spot
         while event_start_hour == -1:
             cur += datetime.timedelta(days=1)
+            cur = cur.replace(hour=0)
             days_passed+=1
             event_start_hour = time_window(creds, 1, cur)
 
