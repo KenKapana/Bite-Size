@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bite Size</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <h1>Bite Size</h1>
+        <p class="app-tagline">Task Manager</p>
+        
+        {% if 'credentials' in session %}
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline">Logout</a>
+        {% endif %}
+      </header>
+
+      <div class="content-wrapper">
+        {% if 'credentials' in session %}
+        
+        <section class="card task-form-card">
+          <h2>Add New Task</h2>
+          <form action="{{ url_for('todo.add') }}" method="post" class="task-form">
+            <div class="form-group">
+              <label for="title">Task Title</label>
+              <input type="text" id="title" name="title" required placeholder="What needs to be done?" />
+            </div>
+            <div class="form-group">
+              <label for="duration">Duration (hours)</label>
+              <input
+                type="number"
+                id="duration"
+                name="duration"
+                min="1"
+                required
+                placeholder="1"
+              />
+            </div>
+            <div class="form-actions">
+              <button type="submit" name="action" value="add_now" class="btn btn-primary">
+                Schedule Now
+              </button>
+              <button type="submit" name="action" value="add_later" class="btn btn-secondary">
+                Add to To-Do List
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card hours-card">
+          <h2>Unavailable Hours</h2>
+          <p>Select hours when you don't want tasks scheduled:</p>
+          <form
+            action="{{ url_for('calendar.submit_hours') }}"
+            method="post"
+            id="hoursForm"
+          >
+            <div class="hours-grid">
+              {% for hour in range(24) %}
+              <div
+                class="hour-box {% if selected_hours and hour in selected_hours %}selected{% endif %}"
+                data-hour="{{ hour }}"
+                onclick="toggleHour(this)"
+              >
+                {{ hour }}:00
+                <input
+                  type="checkbox"
+                  name="hours"
+                  value="{{ hour }}"
+                  {% if selected_hours and hour in selected_hours %}checked{% endif %}
+                  style="display: none"
+                />
+              </div>
+              {% endfor %}
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save Hours</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card todo-card">
+          <h2>Your To-Do List</h2>
+          <div class="task-list">
+            {% if data %} 
+              {% for key, item in data.items() %}
+              <div class="task-item">
+                <div class="task-info">
+                  <span class="task-title">{{ item.title }}</span>
+                  <span class="task-duration">{{ item.duration }} hour(s)</span>
+                </div>
+                <div class="task-buttons">
+                  <form
+                    action="{{ url_for('todo.add_now_from_todo', key=key, title=item.title, duration=item.duration) }}"
+                    method="post"
+                  >
+                    <button type="submit" class="btn btn-small">Schedule</button>
+                  </form>
+                  <form
+                    action="{{ url_for('todo.delete_data', key=key) }}"
+                    method="post"
+                  >
+                    <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                  </form>
+                </div>
+              </div>
+              {% endfor %} 
+            {% else %}
+              <p class="empty-state">No tasks in your to-do list yet.</p>
+            {% endif %}
+          </div>
+        </section>
+
+        {% else %}
+        <div class="login-prompt card">
+          <p>Please login to manage your tasks</p>
+          <a href="{{ url_for('auth.authorize') }}" class="btn btn-primary">Login with Google</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+  </body>
+</html>

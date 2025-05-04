@@ -1,0 +1,5 @@
+.venv
+.env
+credentials.json
+firebase_credentials.json
+node_modules
